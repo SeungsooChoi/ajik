@@ -63,7 +63,7 @@ export default function Entry({ onSubmit }: EntryProps) {
           transition={{ duration: 0.9, delay: 1.0, ease: 'easeOut' }}
           className="block"
         >
-          지금 무엇을 미루고 이곳에 오셨습니까.
+          지금 무엇을 멈추고 이곳에 오셨나요?
         </motion.span>
       </motion.h1>
 
@@ -78,7 +78,7 @@ export default function Entry({ onSubmit }: EntryProps) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="한 문장으로 적으십시오"
+          placeholder="한 문장으로 적으세요"
           rows={2}
           className="w-full resize-none border-b border-stone-400 bg-transparent px-2 py-3 text-center text-lg text-stone-900 placeholder:italic placeholder:text-stone-400 focus:border-stone-900 focus:outline-none"
           style={{ fontWeight: 300 }}
@@ -95,7 +95,7 @@ export default function Entry({ onSubmit }: EntryProps) {
               : 'border-stone-300 text-stone-400 cursor-not-allowed'
           }`}
         >
-          생각한다
+          생각하기
         </motion.button>
       </motion.div>
     </motion.section>

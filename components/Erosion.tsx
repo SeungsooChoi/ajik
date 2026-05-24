@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import SoundControl from './SoundControl';
+import useAmbientSound from '@/hooks/useAmbientSound';
 
 /* ============================================================
  * <Erosion /> — 진행 단계
@@ -42,6 +44,12 @@ export default function Erosion({ text, sessionKey, onPassage }: ErosionProps) {
   const startTimeRef = useRef<number>(performance.now());
   const spawnIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  /* ----- 환경음 훅 -----
+   *  기본값: 백색소음, 15% 볼륨
+   *  사용자가 원하면 SoundControl로 변경 가능 */
+  const { soundType, volume, setSoundType, setVolume } = useAmbientSound('silence', 0.15);
+
+  /* 경과 시간 측정 (RAF) */
   useEffect(() => {
     startTimeRef.current = performance.now();
     const tick = () => {
@@ -54,6 +62,7 @@ export default function Erosion({ text, sessionKey, onPassage }: ErosionProps) {
     };
   }, [sessionKey]);
 
+  /* 텍스트 증식 로직 */
   useEffect(() => {
     setInstances([createInstance(0)]);
     spawnIntervalRef.current = setInterval(() => {
@@ -130,13 +139,18 @@ export default function Erosion({ text, sessionKey, onPassage }: ErosionProps) {
         }}
       />
 
-      {/* 통과 출구 — 자간을 넓혀 절제된 인상 유지 */}
-      <button
-        onClick={() => onPassage(elapsed)}
-        className="cursor-pointer absolute bottom-8 right-10 z-30 text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
-      >
-        통과 →
-      </button>
+      <div className="w-30 absolute bottom-14 right-10 z-30 flex flex-col gap-6">
+        {/* ----- 사운드 컨트롤 (좌측 하단) ----- */}
+        <SoundControl soundType={soundType} volume={volume} onSoundChange={setSoundType} onVolumeChange={setVolume} />
+
+        {/* 통과 출구 — 자간을 넓혀 절제된 인상 유지 */}
+        <button
+          onClick={() => onPassage(elapsed)}
+          className="flex cursor-pointer text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
+        >
+          통과 →
+        </button>
+      </div>
     </div>
   );
 }
