@@ -139,14 +139,14 @@ export default function Erosion({ text, sessionKey, onPassage }: ErosionProps) {
         }}
       />
 
-      <div className="w-30 absolute bottom-14 right-10 z-30 flex flex-col gap-6">
+      <div className="absolute bottom-14 right-10 z-30 flex flex-col items-end gap-6">
         {/* ----- 사운드 컨트롤 (좌측 하단) ----- */}
         <SoundControl soundType={soundType} volume={volume} onSoundChange={setSoundType} onVolumeChange={setVolume} />
 
         {/* 통과 출구 — 자간을 넓혀 절제된 인상 유지 */}
         <button
           onClick={() => onPassage(elapsed)}
-          className="flex cursor-pointer text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
+          className="flex cursor-pointer bg-[#f5f3ee]/80 backdrop-blur-sm px-3 py-2 text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
         >
           통과 →
         </button>

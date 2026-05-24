@@ -1,22 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SoundType } from '@/hooks/useAmbientSound';
 
 /* ============================================================
  * <SoundControl /> — 사운드 컨트롤 UI
  * ------------------------------------------------------------
- * Erosion 화면 좌측 하단에 위치.
+ * Erosion 화면 우측 하단(통과 버튼과 같은 줄)에 위치.
  *
- * 기본 상태: 현재 사운드 라벨만 표시 (예: "백색소음")
- * 호버 시: 사운드 선택지 + 볼륨 슬라이더가 위로 펼쳐짐
+ * 기본 상태: 현재 사운드 라벨 + (재생 중이면) 펄스 점 + 스피커 아이콘
+ * 펼침: hover, 클릭 토글, 외부 클릭/Escape로 닫힘
  *
  * 분위기 보존:
  *  - 통과 출구와 동일한 타이포(자간, 색상)로 시각적 통일
  *  - 펼친 상태에서도 위계가 분명한 미니멀 레이아웃
  * ============================================================ */
-// 미니멀 벡터 스피커 아이콘 컴포넌트
+
 function SpeakerIcon({ isMuted }: { isMuted: boolean }) {
   return (
     <svg
@@ -28,6 +28,7 @@ function SpeakerIcon({ isMuted }: { isMuted: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="h-4 w-4"
+      aria-hidden
     >
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       {isMuted ? (
@@ -42,6 +43,18 @@ function SpeakerIcon({ isMuted }: { isMuted: boolean }) {
         </>
       )}
     </svg>
+  );
+}
+
+// 재생 중임을 표시하는 작은 펄스 점
+function PlayingDot() {
+  return (
+    <motion.span
+      aria-hidden
+      className="inline-block h-[5px] w-[5px] rounded-full bg-stone-900"
+      animate={{ opacity: [0.4, 1, 0.4] }}
+      transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+    />
   );
 }
 
@@ -62,17 +75,35 @@ const SOUND_OPTIONS: { type: SoundType; label: string }[] = [
 
 export default function SoundControl({ soundType, volume, onSoundChange, onVolumeChange }: SoundControlProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  // 현재 선택된 사운드의 라벨 (기본 표시용)
   const currentLabel = SOUND_OPTIONS.find((opt) => opt.type === soundType)?.label ?? '침묵';
   const isMuted = soundType === 'silence';
-
-  // 침묵일 때는 표시 볼륨을 0으로 고정, 아닐 때는 실제 볼륨 표시
   const displayVolume = isMuted ? 0 : Math.round(volume * 100);
+
+  // 외부 클릭 / Escape 키로 닫기
+  useEffect(() => {
+    if (!isOpen) return;
+    const handlePointer = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [isOpen]);
 
   return (
     <div
-      className="absolute w-16 bottom-8 z-30"
+      ref={rootRef}
+      className="relative w-44"
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
     >
@@ -80,32 +111,39 @@ export default function SoundControl({ soundType, volume, onSoundChange, onVolum
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            id="sound-panel"
+            role="group"
+            aria-label="사운드 설정"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            // className="absolute bottom-full left-0 mb-3 w-48 bg-stone-50 p-5 rounded-lg shadow-xl border border-stone-100"
-            className="absolute bottom-6 left-0 mb-6 w-44"
+            className="absolute bottom-full left-0 mb-6 w-44 bg-[#f5f3ee]/75 backdrop-blur-sm px-3 py-3"
           >
             {/* 사운드 옵션 목록 */}
-            <ul className="mb-4 flex flex-col gap-2">
-              {SOUND_OPTIONS.map((opt) => (
-                <li key={opt.type}>
-                  <button
-                    onClick={() => onSoundChange(opt.type)}
-                    className={`text-left text-[11px] uppercase tracking-[0.3em] transition-colors cursor-pointer ${
-                      soundType === opt.type ? 'text-stone-900' : 'text-stone-500 hover:text-stone-800'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                </li>
-              ))}
+            <ul className="mb-5 flex flex-col gap-2">
+              {SOUND_OPTIONS.map((opt) => {
+                const active = soundType === opt.type;
+                return (
+                  <li key={opt.type} className="flex items-center gap-2">
+                    <button
+                      onClick={() => onSoundChange(opt.type)}
+                      aria-pressed={active}
+                      className={`flex-1 text-left text-[11px] uppercase tracking-[0.3em] transition-colors cursor-pointer ${
+                        active ? 'text-stone-900' : 'text-stone-500 hover:text-stone-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                    {active && opt.type !== 'silence' && <PlayingDot />}
+                  </li>
+                );
+              })}
             </ul>
 
             {/* 볼륨 슬라이더 */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] uppercase tracking-[0.3em] text-stone-500">볼륨 {displayVolume}</span>
+            <div className="flex flex-col gap-3">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-stone-500">볼륨 — {displayVolume}%</span>
               <input
                 type="range"
                 min={0}
@@ -121,13 +159,18 @@ export default function SoundControl({ soundType, volume, onSoundChange, onVolum
         )}
       </AnimatePresence>
 
-      {/* ----- 기본 표시 (현재 사운드 라벨) -----
-       *  통과 출구와 같은 톤. 호버 시 약간 진해짐 */}
+      {/* ----- 기본 표시 (현재 사운드 라벨 + 재생 점 + 스피커) ----- */}
       <button
-        className="w-40 flex gap-2 items-center cursor-pointer text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
+        onClick={() => setIsOpen((v) => !v)}
+        aria-expanded={isOpen}
+        aria-controls="sound-panel"
         aria-label="사운드 설정"
+        className="flex w-44 items-center justify-between cursor-pointer bg-[#f5f3ee]/80 backdrop-blur-sm px-3 py-2 text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
       >
-        {currentLabel}
+        <span className="flex items-center gap-2">
+          {currentLabel}
+          {!isMuted && <PlayingDot />}
+        </span>
         <SpeakerIcon isMuted={isMuted} />
       </button>
 
@@ -137,27 +180,39 @@ export default function SoundControl({ soundType, volume, onSoundChange, onVolum
           -webkit-appearance: none;
           appearance: none;
           width: 100%;
-          height: 1px;
-          background: #a8a29e; /* stone-400 */
+          height: 2px;
+          background: #d6d3d1; /* stone-300 */
           outline: none;
           cursor: pointer;
+          transition: background 0.2s ease;
+        }
+        .ajik-slider:hover {
+          background: #a8a29e; /* stone-400 */
         }
         .ajik-slider::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 10px;
-          height: 10px;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
           background: #1c1917; /* stone-900 */
           cursor: pointer;
+          transition: transform 0.15s ease;
+        }
+        .ajik-slider:hover::-webkit-slider-thumb {
+          transform: scale(1.15);
         }
         .ajik-slider::-moz-range-thumb {
-          width: 10px;
-          height: 10px;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
           background: #1c1917;
           cursor: pointer;
           border: none;
+          transition: transform 0.15s ease;
+        }
+        .ajik-slider:hover::-moz-range-thumb {
+          transform: scale(1.15);
         }
       `}</style>
     </div>

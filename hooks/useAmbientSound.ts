@@ -51,6 +51,13 @@ export default function useAmbientSound(
   const rainElementRef = useRef<HTMLAudioElement | null>(null);
   const waveElementRef = useRef<HTMLAudioElement | null>(null);
 
+  // 사운드 전환 effect가 볼륨 변경으로 재실행되어 오디오가 재시작되는 것을 막기 위해
+  // 최신 볼륨을 ref로 보관. 실제 볼륨 변경은 아래의 별도 useEffect가 즉시 반영.
+  const volumeRef = useRef(volume);
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
   /* ----- AudioContext 지연 초기화 -----
    *  자동재생 정책 때문에 사용자 인터랙션 시점에 만들어야 한다.
    *  Erosion 진입 = "직면한다" 버튼 클릭 직후이므로 안전. */
@@ -65,12 +72,12 @@ export default function useAmbientSound(
 
     // 볼륨 제어용 GainNode를 한 번만 만들어 재사용
     const gain = ctx.createGain();
-    gain.gain.value = volume;
+    gain.gain.value = volumeRef.current;
     gain.connect(ctx.destination);
     gainNodeRef.current = gain;
 
     return ctx;
-  }, [volume]);
+  }, []);
 
   /* ----- 노이즈 버퍼 생성 -----
    *  2초 분량 노이즈를 만들고 loop 재생.
@@ -132,34 +139,36 @@ export default function useAmbientSound(
     setIsPlaying(false);
   }, []);
 
-  /* ----- 사운드 종류 변경 감지 → 재생/정지 처리 ----- */
+  /* ----- 사운드 종류 변경 감지 → 재생/정지 처리 -----
+   *  silence는 stopAll로 일괄 처리.
+   *  그 외 전환은 noise/rain/wave 세 소스를 모두 멈춘 뒤 새 소스를 시작 —
+   *  분기별 개별 정리를 누락해 발생했던 rain ↔ wave 동시 재생 버그 차단. */
   useEffect(() => {
-    // 무음이면 모든 사운드 정지
     if (soundType === 'silence') {
       stopAll();
       return;
     }
 
-    // 노이즈 종류라면 Web Audio API로 처리
-    if (soundType === 'white' || soundType === 'pink') {
-      // 기존 빗소리는 멈춤
-      if (rainElementRef.current) {
-        rainElementRef.current.pause();
-        rainElementRef.current.currentTime = 0;
-      }
+    if (noiseSourceRef.current) {
+      try {
+        noiseSourceRef.current.stop();
+      } catch {}
+      noiseSourceRef.current.disconnect();
+      noiseSourceRef.current = null;
+    }
+    if (rainElementRef.current) {
+      rainElementRef.current.pause();
+      rainElementRef.current.currentTime = 0;
+    }
+    if (waveElementRef.current) {
+      waveElementRef.current.pause();
+      waveElementRef.current.currentTime = 0;
+    }
 
+    if (soundType === 'white' || soundType === 'pink') {
       const ctx = ensureContext();
       const gain = gainNodeRef.current!;
 
-      // 기존 노이즈 소스가 있다면 정리
-      if (noiseSourceRef.current) {
-        try {
-          noiseSourceRef.current.stop();
-        } catch {}
-        noiseSourceRef.current.disconnect();
-      }
-
-      // 새 노이즈 버퍼 생성 후 loop 재생
       const source = ctx.createBufferSource();
       source.buffer = createNoiseBuffer(ctx, soundType);
       source.loop = true;
@@ -171,68 +180,42 @@ export default function useAmbientSound(
       return;
     }
 
-    // 빗소리 — <audio> 엘리먼트로 재생
     if (soundType === 'rain') {
-      // 노이즈 정지
-      if (noiseSourceRef.current) {
-        try {
-          noiseSourceRef.current.stop();
-        } catch {}
-        noiseSourceRef.current.disconnect();
-        noiseSourceRef.current = null;
-      }
-
-      // audio 엘리먼트가 없다면 생성
       if (!rainElementRef.current) {
         const audio = new Audio(RAIN_FILE_PATH);
         audio.loop = true;
-        audio.volume = volume;
         rainElementRef.current = audio;
       }
-
       const audio = rainElementRef.current;
-      audio.volume = volume;
+      audio.volume = volumeRef.current;
       audio
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => {
-          // 파일이 없거나 자동재생이 막힌 경우
           console.warn('빗소리 재생 실패:', err);
           setIsPlaying(false);
         });
+      return;
     }
 
-    // 파도소리 — <audio> 엘리먼트로 재생
     if (soundType === 'wave') {
-      // 노이즈 정지
-      if (noiseSourceRef.current) {
-        try {
-          noiseSourceRef.current.stop();
-        } catch {}
-        noiseSourceRef.current.disconnect();
-        noiseSourceRef.current = null;
-      }
-
-      // audio 엘리먼트가 없다면 생성
       if (!waveElementRef.current) {
         const audio = new Audio(WAVES_FILE_PATH);
         audio.loop = true;
-        audio.volume = volume;
         waveElementRef.current = audio;
       }
-
       const audio = waveElementRef.current;
-      audio.volume = volume;
+      audio.volume = volumeRef.current;
       audio
         .play()
         .then(() => setIsPlaying(true))
         .catch((err) => {
-          // 파일이 없거나 자동재생이 막힌 경우
           console.warn('파도소리 재생 실패:', err);
           setIsPlaying(false);
         });
+      return;
     }
-  }, [soundType, ensureContext, createNoiseBuffer, stopAll, volume]);
+  }, [soundType, ensureContext, createNoiseBuffer, stopAll]);
 
   /* ----- 볼륨 변경 → 즉시 반영 ----- */
   useEffect(() => {
@@ -241,6 +224,9 @@ export default function useAmbientSound(
     }
     if (rainElementRef.current) {
       rainElementRef.current.volume = volume;
+    }
+    if (waveElementRef.current) {
+      waveElementRef.current.volume = volume;
     }
   }, [volume]);
 

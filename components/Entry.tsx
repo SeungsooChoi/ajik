@@ -40,7 +40,7 @@ export default function Entry({ onSubmit }: EntryProps) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 1.0, ease: 'easeOut' }}
-      className="flex min-h-screen w-full flex-col items-center justify-center px-6"
+      className="relative flex min-h-screen w-full flex-col items-center justify-center px-6"
     >
       {/* 작은 표식 — 자간을 극단적으로 넓혀 산세리프 같은 절제된 인상 */}
       <motion.p
@@ -98,6 +98,16 @@ export default function Entry({ onSubmit }: EntryProps) {
           생각하기
         </motion.button>
       </motion.div>
+
+      {/* 카피라이트 — 사운드/통과 버튼과 동일한 위계의 미니멀 서명 */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.0, delay: 2.8, ease: 'easeOut' }}
+        className="absolute bottom-8 left-0 right-0 text-center text-[11px] uppercase tracking-[0.4em] text-stone-500"
+      >
+        © 2026 SEUNGSOO CHOI
+      </motion.footer>
     </motion.section>
   );
 }

@@ -55,7 +55,7 @@ export default function Passage({ elapsedSeconds, onReset }: PassageProps) {
         transition={{ duration: 1.2, delay: 2.8 }}
         className="text-center text-base italic text-stone-700"
       >
-        생각의 변화가 생겼을까요?
+        그것으로 충분합니다.
       </motion.p>
     </motion.section>
   );
