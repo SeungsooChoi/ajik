@@ -1,25 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 /* ============================================================
- * <Erosion /> — 메인 진행 단계 (Visual Erosion)
+ * <Erosion /> — 진행 단계
  * ------------------------------------------------------------
- * 사용자가 고백한 문장을 시간이 지날수록 점점 더 많이,
- * 점점 더 굵고 진하게 화면 전체에 증식시킨다.
- *
- * 시각적 압박 메커니즘:
- *  1) 텍스트 개수 증식 (3초마다 1개, 최대 80개)
- *  2) 무작위 좌표 분포
- *  3) 인스턴스별 페이드인 (0 → 1, 8초)
- *  4) 가변 폰트 굵기 (100 → 900, 60초)
- *  5) 시간 경과에 따른 가장자리 비네팅 (배경 압박)
+ * 단일 폰트(Newsreader)로 통일.
+ * 증식 텍스트도 세리프로 — '문장이 쌓여가는' 인상이 산세리프보다
+ * 더 무게 있게 다가온다.
  * ============================================================ */
 
 interface ErosionProps {
   text: string;
   sessionKey: string;
+  onPassage: (elapsedSeconds: number) => void;
 }
 
 interface Instance {
@@ -32,7 +27,14 @@ interface Instance {
   bornAt: number;
 }
 
-export default function Erosion({ text, sessionKey }: ErosionProps) {
+const OBSERVATIONS: [number, string][] = [
+  [0, '당신이 머물고 있습니다.'],
+  [60, '조금 더 머무르십시오.'],
+  [180, '당신은 그 일과 함께 있습니다.'],
+  [360, '이 시간은 사라지지 않습니다.'],
+];
+
+export default function Erosion({ text, sessionKey, onPassage }: ErosionProps) {
   const [elapsed, setElapsed] = useState(0);
   const [instances, setInstances] = useState<Instance[]>([]);
 
@@ -40,29 +42,20 @@ export default function Erosion({ text, sessionKey }: ErosionProps) {
   const startTimeRef = useRef<number>(performance.now());
   const spawnIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  /* ----- 경과 시간 측정 (RAF 기반) -----
-   * 탭이 hidden일 때 RAF는 자동 멈춤 → 백그라운드 카운트 누적 방지 */
   useEffect(() => {
     startTimeRef.current = performance.now();
-
     const tick = () => {
-      const now = performance.now();
-      const seconds = (now - startTimeRef.current) / 1000;
-      setElapsed(seconds);
+      setElapsed((performance.now() - startTimeRef.current) / 1000);
       rafRef.current = requestAnimationFrame(tick);
     };
-
     rafRef.current = requestAnimationFrame(tick);
-
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [sessionKey]);
 
-  /* ----- 텍스트 증식 로직 ----- */
   useEffect(() => {
     setInstances([createInstance(0)]);
-
     spawnIntervalRef.current = setInterval(() => {
       setInstances((prev) => {
         if (prev.length >= 80) return prev;
@@ -70,31 +63,37 @@ export default function Erosion({ text, sessionKey }: ErosionProps) {
         return [...prev, createInstance(now)];
       });
     }, 3000);
-
     return () => {
       if (spawnIntervalRef.current) clearInterval(spawnIntervalRef.current);
     };
   }, [sessionKey]);
 
-  // 전역 진행도 (0 ~ 1)
   const progress = Math.min(elapsed / 60, 1);
-  const globalWeight = Math.round(100 + progress * 800); // 100 → 900
+
+  const currentObservation = useMemo(() => {
+    let chosen = OBSERVATIONS[0][1];
+    for (const [threshold, sentence] of OBSERVATIONS) {
+      if (elapsed >= threshold) chosen = sentence;
+    }
+    return chosen;
+  }, [elapsed]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden font-sans" style={{ background: '#f5f3ee' }}>
-      {/* 상단 좌측: 경과 시간 */}
-      <div className="absolute left-8 top-8 z-20">
-        <p className="text-xs uppercase tracking-[0.3em] text-stone-400">경과</p>
-        <p className="mt-1 text-lg tabular-nums text-stone-700">{formatTime(elapsed)}</p>
+    <div className="relative h-screen w-full overflow-hidden" style={{ background: '#f5f3ee' }}>
+      {/* 응시자 — 이탤릭 세리프로 부드러운 응시감 */}
+      <div className="absolute left-0 right-0 top-14 z-20 flex justify-center">
+        <motion.p
+          key={currentObservation}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.6, ease: 'easeOut' }}
+          className="text-sm italic text-stone-700"
+        >
+          {currentObservation}
+        </motion.p>
       </div>
 
-      {/* 상단 우측: 증식 카운트 */}
-      <div className="absolute right-8 top-8 z-20 text-right">
-        <p className="text-xs uppercase tracking-[0.3em] text-stone-400">증식</p>
-        <p className="mt-1 text-lg tabular-nums text-stone-700">{instances.length}</p>
-      </div>
-
-      {/* 증식 텍스트 레이어 */}
+      {/* 증식 텍스트 — 세리프의 무게가 누적되는 효과 */}
       {instances.map((inst) => {
         const age = elapsed - inst.bornAt;
         const localOpacity = Math.max(0, Math.min(age / 8, 1));
@@ -111,10 +110,8 @@ export default function Erosion({ text, sessionKey }: ErosionProps) {
               top: `${inst.y}%`,
               transform: `translate(-50%, -50%) rotate(${inst.rotate}deg)`,
               transformOrigin: 'center',
-              fontVariationSettings: `"wght" ${globalWeight}`,
-              fontWeight: globalWeight,
+              fontWeight: 400,
               fontSize: `${inst.fontSize}px`,
-              letterSpacing: `${-0.01 * progress}em`,
             }}
           >
             {text}
@@ -122,37 +119,28 @@ export default function Erosion({ text, sessionKey }: ErosionProps) {
         );
       })}
 
-      {/* ----- 비네팅 레이어 -----
-       * 시간이 지날수록 화면 가장자리가 어두워지며 압박감 가중
-       * pointer-events-none으로 인터랙션 막지 않음 */}
+      {/* 비네팅 */}
       <div
         className="pointer-events-none absolute inset-0 z-10"
         style={{
           background: `radial-gradient(ellipse at center,
-            transparent 40%,
-            rgba(0, 0, 0, ${progress * 0.25}) 100%)`,
+            transparent 35%,
+            rgba(0, 0, 0, ${progress * 0.35}) 100%)`,
           transition: 'background 0.4s linear',
         }}
       />
 
-      {/* 하단: 진행도 게이지 */}
-      <div className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2 text-center">
-        <p className="text-xs uppercase tracking-[0.3em] text-stone-400">압박 강도</p>
-        <div className="mt-2 h-px w-64 bg-stone-300">
-          <motion.div
-            className="h-full bg-stone-800"
-            animate={{ width: `${progress * 100}%` }}
-            transition={{ duration: 0.4, ease: 'linear' }}
-          />
-        </div>
-      </div>
+      {/* 통과 출구 — 자간을 넓혀 절제된 인상 유지 */}
+      <button
+        onClick={() => onPassage(elapsed)}
+        className="cursor-pointer absolute bottom-8 right-10 z-30 text-md uppercase tracking-[0.4em] text-stone-500 transition-colors hover:text-stone-900"
+      >
+        통과 →
+      </button>
     </div>
   );
 }
 
-/* ============================================================
- * 헬퍼
- * ============================================================ */
 function createInstance(bornAt: number): Instance {
   return {
     id: `${bornAt}-${Math.random().toString(36).slice(2, 8)}`,
@@ -163,11 +151,4 @@ function createInstance(bornAt: number): Instance {
     fontSize: 18 + Math.random() * 38,
     bornAt,
   };
-}
-
-function formatTime(totalSeconds: number): string {
-  const total = Math.floor(totalSeconds);
-  const m = String(Math.floor(total / 60)).padStart(2, '0');
-  const s = String(total % 60).padStart(2, '0');
-  return `${m}:${s}`;
 }

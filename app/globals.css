@@ -1,11 +1,14 @@
+/* ============================================================
+ *  globals.css — 전역 스타일
+ *  - Newsreader 단일 폰트로 통일
+ *  - 모든 위계는 크기·자간·이탤릭·색상으로 표현
+ * ============================================================ */
+
 @import 'tailwindcss';
 
-/* ============================================================
- * next/font가 주입한 CSS 변수를 Tailwind에 연결
- * v4에서는 tailwind.config 대신 CSS 안에서 테마 확장
- * ============================================================ */
 @theme {
-  --font-family-sans: var(--font-manrope), system-ui, sans-serif;
+  /* 단일 폰트 — body에서 자동 적용 */
+  --font-family-sans: var(--font-newsreader), Georgia, serif;
   --font-family-serif: var(--font-newsreader), Georgia, serif;
 }
 
@@ -15,6 +18,7 @@ body {
   margin: 0;
   padding: 0;
   background: #f5f3ee;
+  font-family: var(--font-newsreader), Georgia, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
