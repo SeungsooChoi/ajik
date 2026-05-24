@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+/* ============================================================
+ * next/font가 주입한 CSS 변수를 Tailwind에 연결
+ * v4에서는 tailwind.config 대신 CSS 안에서 테마 확장
+ * ============================================================ */
+@theme {
+  --font-family-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-family-serif: var(--font-newsreader), Georgia, serif;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #f5f3ee;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: #292524;
+  color: #fafaf9;
+}
