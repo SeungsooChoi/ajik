@@ -21,7 +21,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  *  - 컴포넌트 언마운트 시 모든 노드/소스를 정리
  * ============================================================ */
 
-export type SoundType = 'silence' | 'white' | 'pink' | 'rain';
+export type SoundType = 'silence' | 'white' | 'pink' | 'rain' | 'wave';
 
 interface UseAmbientSoundReturn {
   soundType: SoundType;
@@ -31,7 +31,8 @@ interface UseAmbientSoundReturn {
   setVolume: (vol: number) => void;
 }
 
-const RAIN_FILE_PATH = '/sounds/rain.mp3'; // public/sounds/rain.mp3
+const RAIN_FILE_PATH = '/sounds/rain.mp3';
+const WAVES_FILE_PATH = '/sounds/waves.mp3';
 
 export default function useAmbientSound(
   // 초기 사운드 — Erosion 시작 시 자동으로 켜질 사운드
@@ -48,6 +49,7 @@ export default function useAmbientSound(
   const gainNodeRef = useRef<GainNode | null>(null);
   const noiseSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const rainElementRef = useRef<HTMLAudioElement | null>(null);
+  const waveElementRef = useRef<HTMLAudioElement | null>(null);
 
   /* ----- AudioContext 지연 초기화 -----
    *  자동재생 정책 때문에 사용자 인터랙션 시점에 만들어야 한다.
@@ -123,6 +125,10 @@ export default function useAmbientSound(
       rainElementRef.current.pause();
       rainElementRef.current.currentTime = 0;
     }
+    if (waveElementRef.current) {
+      waveElementRef.current.pause();
+      waveElementRef.current.currentTime = 0;
+    }
     setIsPlaying(false);
   }, []);
 
@@ -192,6 +198,37 @@ export default function useAmbientSound(
         .catch((err) => {
           // 파일이 없거나 자동재생이 막힌 경우
           console.warn('빗소리 재생 실패:', err);
+          setIsPlaying(false);
+        });
+    }
+
+    // 파도소리 — <audio> 엘리먼트로 재생
+    if (soundType === 'wave') {
+      // 노이즈 정지
+      if (noiseSourceRef.current) {
+        try {
+          noiseSourceRef.current.stop();
+        } catch {}
+        noiseSourceRef.current.disconnect();
+        noiseSourceRef.current = null;
+      }
+
+      // audio 엘리먼트가 없다면 생성
+      if (!waveElementRef.current) {
+        const audio = new Audio(WAVES_FILE_PATH);
+        audio.loop = true;
+        audio.volume = volume;
+        waveElementRef.current = audio;
+      }
+
+      const audio = waveElementRef.current;
+      audio.volume = volume;
+      audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          // 파일이 없거나 자동재생이 막힌 경우
+          console.warn('파도소리 재생 실패:', err);
           setIsPlaying(false);
         });
     }

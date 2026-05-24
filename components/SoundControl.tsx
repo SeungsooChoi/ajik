@@ -57,6 +57,7 @@ const SOUND_OPTIONS: { type: SoundType; label: string }[] = [
   { type: 'white', label: '백색소음' },
   { type: 'pink', label: '핑크노이즈' },
   { type: 'rain', label: '빗소리' },
+  { type: 'wave', label: '파도소리' },
 ];
 
 export default function SoundControl({ soundType, volume, onSoundChange, onVolumeChange }: SoundControlProps) {
